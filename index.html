@@ -39,6 +39,12 @@
             margin-bottom: 20px;
             animation: pulse 2s infinite;
         }
+        #loading-status {
+            color: #2196F3;
+            font-size: 14px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
         .spinner {
             width: 50px;
             height: 50px;
@@ -67,7 +73,7 @@
             border-radius: 10px;
             backdrop-filter: blur(5px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            display: none; /* Скрыто до окончания загрузки */
+            display: none; 
         }
         h2 { margin-top: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
         .btn-group { display: flex; flex-wrap: wrap; gap: 10px; max-width: 350px; }
@@ -98,6 +104,7 @@
     <div id="loading-screen">
         <div id="loading-text">Идет загрузка текстур...</div>
         <div class="spinner"></div>
+        <div id="loading-status">Подготовка ресурсов...</div>
     </div>
 
     <div id="ui-layer">
@@ -132,6 +139,10 @@
         let uranus;
         let neptune;
         let pluto, charonPivot;
+
+        let texturesLoaded = false;
+        let itemsLoaded = 0;
+        let itemsTotal = 0;
 
         // Настройка прокси
         const proxy = "https://images.weserv.nl/?url=";
@@ -212,7 +223,22 @@
             const ambientLight = new THREE.AmbientLight(0x222222);
             scene.add(ambientLight);
 
-            const loader = new THREE.TextureLoader();
+            // Настройка менеджера загрузки
+            const manager = new THREE.LoadingManager();
+            const statusEl = document.getElementById('loading-status');
+
+            manager.onProgress = function (url, itemsL, itemsT) {
+                itemsLoaded = itemsL;
+                itemsTotal = itemsT;
+                statusEl.innerText = `Загружено: ${itemsL} из ${itemsT}`;
+            };
+
+            manager.onLoad = function () {
+                texturesLoaded = true;
+                statusEl.innerText = "Все текстуры загружены. Запуск...";
+            };
+
+            const loader = new THREE.TextureLoader(manager);
             loader.setCrossOrigin('anonymous');
 
             const createMoon = (radius, dist, textureUrl) => {
@@ -341,16 +367,19 @@
 
             window.addEventListener('resize', onWindowResize, false);
             
-            // Запуск таймера загрузки (8 секунд)
-            setTimeout(() => {
-                const loaderScreen = document.getElementById('loading-screen');
-                const uiLayer = document.getElementById('ui-layer');
-                loaderScreen.style.opacity = '0';
-                setTimeout(() => {
-                    loaderScreen.style.display = 'none';
-                    uiLayer.style.display = 'block';
-                }, 1000);
-            }, 8000);
+            // Периодическая проверка готовности (каждые 0.5 сек)
+            const checkReady = setInterval(() => {
+                if (texturesLoaded) {
+                    clearInterval(checkReady);
+                    const loaderScreen = document.getElementById('loading-screen');
+                    const uiLayer = document.getElementById('ui-layer');
+                    loaderScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loaderScreen.style.display = 'none';
+                        uiLayer.style.display = 'block';
+                    }, 1000);
+                }
+            }, 500);
 
             animate();
             switchPlanet('earth');
